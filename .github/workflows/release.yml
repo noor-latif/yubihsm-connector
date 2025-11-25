@@ -66,6 +66,7 @@ jobs:
   Windowsx-build:
     name: Build Windows release binaries
     runs-on: windows-latest
+    needs: version
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -99,6 +100,7 @@ jobs:
   macos-build:
     name: Build MacOS release binaries
     runs-on: ${{ matrix.os }}
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -206,6 +208,7 @@ jobs:
           path: artifact/yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}.tar.gz
 
   debian_based:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -301,6 +304,7 @@ jobs:
           path: ${{ env.PLATFORM }}
 
   redhat_based:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
