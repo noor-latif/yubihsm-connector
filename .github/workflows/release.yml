@@ -200,12 +200,10 @@ jobs:
           cd ..
 
       - name: Upload artifact
-        env:
-          VERSION: ${{ needs.version.outputs.version }}
         uses: actions/upload-artifact@v4
         with:
           name: yubihsm-connector-linux-${{ matrix.arch }}
-          path: artifact/yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}.tar.gz
+          path: artifact/yubihsm-connector-${{ needs.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
 
   debian_based:
     needs: version
