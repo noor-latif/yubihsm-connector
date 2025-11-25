@@ -1,1 +1,1 @@
-adduser --no-create-home --home /nonexistent --group --system yubihsm-connector
+adduser --system --group --no-create-home --gecos "" yubihsm-connector || true
