@@ -263,13 +263,13 @@ jobs:
           PLATFORM: ${{ env.PLATFORM }}
         run: |
           set -x
-          
+
           # Create directory containing all output
           OUTPUT=$GITHUB_WORKSPACE/$PLATFORM/yubihsm-connector
           mkdir -p $OUTPUT
-          
+
           export PATH=$PATH:/usr/local/go/bin
-          
+
           make
           strip --strip-all bin/yubihsm-connector
           version=`bin/yubihsm-connector version`
@@ -286,11 +286,9 @@ jobs:
           cd $OUTPUT
           rm -f yubihsm-connector-$PLATFORM-amd64.tar.gz
           tar -C .. -zcvf ../yubihsm-connector-$PLATFORM-amd64.tar.gz yubihsm-connector
-          rm -f *.deb
-          rm -rf licenses
-          rm -rf ../yubihsm-connector
 
       - name: install binaries
+        working-directory: ${{ github.workspace }}/${{ env.PLATFORM }}/yubihsm-connector
         run: |
           set -x
           dpkg -i ./yubihsm-connector_*.deb
