@@ -293,6 +293,14 @@ jobs:
           set -x
           dpkg -i ./yubihsm-connector_*.deb
 
+      - name: cleanup build directory
+        working-directory: ${{ github.workspace }}/${{ env.PLATFORM }}/yubihsm-connector
+        run: |
+          set -x
+          rm -f *.deb
+          rm -rf licenses
+          rm -rf ../yubihsm-connector
+
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
