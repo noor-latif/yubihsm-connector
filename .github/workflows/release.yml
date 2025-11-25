@@ -1,20 +1,52 @@
 name: Release binaries
 # This machine tests building the software on a both 32 and 64 Windows architecture.
 
-on: [push]
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
+
+  version:
+    name: Extract version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      
+      - name: Extract version from tag
+        id: extract
+        run: |
+          if [ -n "${{ github.ref_name }}" ]; then
+            # Remove 'v' prefix if present
+            VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          else
+            # Fallback to VERSION file
+            VERSION=$(cat VERSION | jq -r '"\(.major).\(.minor).\(.patch)"')
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
 
   source:
     name: Build source release
     runs-on: ubuntu-latest
-    env:
-      VERSION: 3.0.4
+    needs: version
     steps:
       - name: checkout
         uses: actions/checkout@v4
 
       - name: Make source release
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -e -o pipefail
           set -x
@@ -99,6 +131,79 @@ jobs:
         with:
           name: yubihsm-connector-mac-${{ matrix.arch }}64
           path: artifact
+
+  linux-binaries:
+    name: Build Linux binaries
+    runs-on: ubuntu-latest
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.17'
+
+      - name: Install cross-compilation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu libusb-1.0-0-dev
+
+      - name: Build binary
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 1
+        run: |
+          set -e -o pipefail
+          set -x
+          
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            export CC=aarch64-linux-gnu-gcc
+          fi
+          
+          go mod tidy
+          go generate ./...
+          go build -o bin/yubihsm-connector
+          strip --strip-all bin/yubihsm-connector
+
+      - name: Package release
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -e -o pipefail
+          set -x
+          
+          mkdir -p artifact/yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}
+          
+          # Copy binary
+          cp bin/yubihsm-connector artifact/yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}/
+          
+          # Copy config file
+          cp deb/yubihsm-connector.yaml artifact/yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}/yubihsm-connector.yaml.example
+          
+          # Copy udev rules
+          mkdir -p artifact/yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}/udev
+          cp deb/70-yubihsm-connector.rules artifact/yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}/udev/
+          
+          # Create tarball
+          cd artifact
+          tar -czf yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}.tar.gz yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}
+          cd ..
+
+      - name: Upload artifact
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: yubihsm-connector-linux-${{ matrix.arch }}
+          path: artifact/yubihsm-connector-${VERSION}-linux-${{ matrix.arch }}.tar.gz
 
   debian_based:
     strategy:
@@ -274,3 +379,28 @@ jobs:
         with:
           name: "yubihsm-connector-${{ env.PLATFORM }}-amd64"
           path: ${{ env.PLATFORM }}
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [version, source, Windowsx-build, macos-build, linux-binaries, debian_based, redhat_based]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ needs.version.outputs.version }}
+          files: |
+            release-artifacts/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

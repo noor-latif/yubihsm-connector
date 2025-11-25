@@ -1,5 +1,11 @@
 = YubiHSM Connector
 
+== Downloads
+
+Official releases are available on the link:https://github.com/Yubico/yubihsm-connector/releases[GitHub Releases] page, including Linux binaries for both `amd64` and `arm64` architectures.
+
+Distro-specific packages (`.deb`, `.rpm`) continue to be available on the link:https://developers.yubico.com/YubiHSM2/Releases/[Yubico developers site] for backwards compatibility.
+
 == Usage
 
 The connector is self documenting, peruse the `--help`'s.
